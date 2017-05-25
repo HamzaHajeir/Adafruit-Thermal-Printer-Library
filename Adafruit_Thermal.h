@@ -102,6 +102,18 @@
  #define CODEPAGE_THAI2       45
  #define CODEPAGE_CP856       46
  #define CODEPAGE_CP874       47
+
+ //QR barcode models
+ #define MODEL_1  49
+ #define MODEL_2  50
+ #define MICRO_QR 51
+ 
+ //QR Code error correction levels 
+ #define LEVEL_L  48
+ #define LEVEL_M  49
+ #define LEVEL_Q  50
+ #define LEVEL_H  51
+
 #else
  #define UPC_A    0
  #define UPC_E    1
@@ -146,8 +158,10 @@ class Adafruit_Thermal : public Print {
     printBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem=true),
     printBitmap(int w, int h, Stream *fromStream),
     printBitmap(Stream *fromStream),
+    printQRcode(char *text, uint8_t errCorrect=48, uint8_t moduleSize=3, uint8_t model=50, uint16_t timeoutQR=4000000L), // Only works on printers with support for this feature
     normal(),
     reset(),
+    reprintQRcode(uint16_t timeoutQR=4000000L), // Only works on printers with support for this feature
     setBarcodeHeight(uint8_t val=50),
     setCharSpacing(int spacing=0), // Only works w/recent firmware
     setCharset(uint8_t val=0),
