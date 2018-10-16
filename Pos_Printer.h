@@ -1,30 +1,23 @@
 /*------------------------------------------------------------------------
-  An Arduino library for the Adafruit Thermal Printer:
-
-  https://www.adafruit.com/product/597
+  An Arduino library for a POSIFLEX PP-700II Printer:
 
   These printers use TTL serial to communicate.  One pin (5V or 3.3V) is
   required to issue data to the printer.  A second pin can OPTIONALLY be
   used to poll the paper status, but not all printers support this, and
   the output on this pin is 5V which may be damaging to some MCUs.
 
-  Adafruit invests time and resources providing this open source code.
-  Please support Adafruit and open-source hardware by purchasing products
-  from Adafruit!
-
-  Written by Limor Fried/Ladyada for Adafruit Industries, with
-  contributions from the open source community.  Originally based on
-  Thermal library from bildr.org
+  Originally based on adafruit thermal printer library 
+  https://github.com/adafruit/Adafruit-Thermal-Printer-Library 
   MIT license, all text above must be included in any redistribution.
   ------------------------------------------------------------------------*/
 
-#ifndef ADAFRUIT_THERMAL_H
-#define ADAFRUIT_THERMAL_H
+#ifndef Pos_Printer_H
+#define Pos_Printer_H
 
 // *** EDIT THIS NUMBER ***  Printer firmware version is shown on test
 // page (hold feed button when connecting power).  Number used here is
 // integerized, e.g. 268 = 2.68 firmware.
-#define PRINTER_FIRMWARE 268
+#define PRINTER_FIRMWARE 629    //268
 
 #include "Arduino.h"
 
@@ -116,13 +109,13 @@
  #define MSI     10
 #endif
 
-class Adafruit_Thermal : public Print {
+class Pos_Printer : public Print {
 
  public:
 
   // IMPORTANT: constructor syntax has changed from prior versions
   // of this library.  Please see notes in the example code!
-  Adafruit_Thermal(Stream *s=&Serial, uint8_t dtr=255);
+  Pos_Printer(Stream *s=&Serial, uint8_t dtr=255);
 
   size_t
     write(uint8_t c);
@@ -143,9 +136,11 @@ class Adafruit_Thermal : public Print {
     offline(),
     online(),
     printBarcode(char *text, uint8_t type),
-    printBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem=true),
-    printBitmap(int w, int h, Stream *fromStream),
-    printBitmap(Stream *fromStream),
+	  
+	  printBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem = true),
+    printBitmap_ada(int w, int h, const uint8_t *bitmap, bool fromProgMem=true),
+    printBitmap_ada(int w, int h, Stream *fromStream),
+    printBitmap_ada(Stream *fromStream),
     normal(),
     reset(),
     setBarcodeHeight(uint8_t val=50),
@@ -170,7 +165,17 @@ class Adafruit_Thermal : public Print {
     underlineOn(uint8_t weight=1),
     upsideDownOff(),
     upsideDownOn(),
-    wake();
+    wake(),
+
+  	cut(),
+  	beep(),
+    defineBitImage( int w, int h, const uint8_t *bitmap),
+    printDefinedBitImage(int mode=0),
+    printNVBitmap(int n, int mode=0),
+    defineNVBitmap(int w, int h, const uint8_t *bitmap),
+    defineNVBitmap(int w1, int h1, const uint8_t *bitmap1,int w2, int h2, const uint8_t *bitmap2),
+    setBeep(int sec);
+
   bool
     hasPaper();
 
@@ -199,10 +204,13 @@ class Adafruit_Thermal : public Print {
     writeBytes(uint8_t a, uint8_t b),
     writeBytes(uint8_t a, uint8_t b, uint8_t c),
     writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d),
+	// Riva addition _ Updated
+    writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t h),
+	
     setPrintMode(uint8_t mask),
     unsetPrintMode(uint8_t mask),
     writePrintMode();
 
 };
 
-#endif // ADAFRUIT_THERMAL_H
+#endif // Pos_Printer_H
