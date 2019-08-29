@@ -1,30 +1,24 @@
 /*------------------------------------------------------------------------
-  An Arduino library for the Adafruit Thermal Printer:
-
-  https://www.adafruit.com/product/597
+  An Arduino library for a POSIFLEX PP-700II Printer:
 
   These printers use TTL serial to communicate.  One pin (5V or 3.3V) is
   required to issue data to the printer.  A second pin can OPTIONALLY be
   used to poll the paper status, but not all printers support this, and
   the output on this pin is 5V which may be damaging to some MCUs.
 
-  Adafruit invests time and resources providing this open source code.
-  Please support Adafruit and open-source hardware by purchasing products
-  from Adafruit!
-
-  Written by Limor Fried/Ladyada for Adafruit Industries, with
-  contributions from the open source community.  Originally based on
-  Thermal library from bildr.org
+  Originally based on adafruit thermal printer library 
+  https://github.com/adafruit/Adafruit-Thermal-Printer-Library 
   MIT license, all text above must be included in any redistribution.
   ------------------------------------------------------------------------*/
 
-#include "Adafruit_Thermal.h"
+#include "Pos_Printer.h"
 
 // Though most of these printers are factory configured for 19200 baud
 // operation, a few rare specimens instead work at 9600.  If so, change
 // this constant.  This will NOT make printing slower!  The physical
 // print and feed mechanisms are the bottleneck, not the port speed.
-#define BAUDRATE  19200
+
+#define BAUDRATE  19200  //Check the switches under the PP-700II to verify baud
 
 // ASCII codes used by some of the printer config commands:
 #define ASCII_TAB '\t' // Horizontal tab
@@ -53,18 +47,18 @@
 #define BYTE_TIME (((11L * 1000000L) + (BAUDRATE / 2)) / BAUDRATE)
 
 // Constructor
-Adafruit_Thermal::Adafruit_Thermal(Stream *s, uint8_t dtr) :
+Pos_Printer::Pos_Printer(Stream *s, uint8_t dtr) :
   stream(s), dtrPin(dtr) {
   dtrEnabled = false;
 }
 
 // This method sets the estimated completion time for a just-issued task.
-void Adafruit_Thermal::timeoutSet(unsigned long x) {
+void Pos_Printer::timeoutSet(unsigned long x) {
   if(!dtrEnabled) resumeTime = micros() + x;
 }
 
 // This function waits (if necessary) for the prior task to complete.
-void Adafruit_Thermal::timeoutWait() {
+void Pos_Printer::timeoutWait() {
   if(dtrEnabled) {
     while(digitalRead(dtrPin) == HIGH){yield();};
   } else {
@@ -83,7 +77,7 @@ void Adafruit_Thermal::timeoutWait() {
 // but as stated above your reality may be influenced by many factors.
 // This lets you tweak the timing to avoid excessive delays and/or
 // overrunning the printer buffer.
-void Adafruit_Thermal::setTimes(unsigned long p, unsigned long f) {
+void Pos_Printer::setTimes(unsigned long p, unsigned long f) {
   dotPrintTime = p;
   dotFeedTime  = f;
 }
@@ -91,20 +85,20 @@ void Adafruit_Thermal::setTimes(unsigned long p, unsigned long f) {
 // The next four helper methods are used when issuing configuration
 // commands, printing bitmaps or barcodes, etc.  Not when printing text.
 
-void Adafruit_Thermal::writeBytes(uint8_t a) {
+void Pos_Printer::writeBytes(uint8_t a) {
   timeoutWait();
   stream->write(a);
   timeoutSet(BYTE_TIME);
 }
 
-void Adafruit_Thermal::writeBytes(uint8_t a, uint8_t b) {
+void Pos_Printer::writeBytes(uint8_t a, uint8_t b) {
   timeoutWait();
   stream->write(a);
   stream->write(b);
   timeoutSet(2 * BYTE_TIME);
 }
 
-void Adafruit_Thermal::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
+void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
   timeoutWait();
   stream->write(a);
   stream->write(b);
@@ -112,7 +106,7 @@ void Adafruit_Thermal::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
   timeoutSet(3 * BYTE_TIME);
 }
 
-void Adafruit_Thermal::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
+void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
   timeoutWait();
   stream->write(a);
   stream->write(b);
@@ -121,11 +115,35 @@ void Adafruit_Thermal::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
   timeoutSet(4 * BYTE_TIME);
 }
 
+// Riva Addition _ Updated
+void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t h) {
+  timeoutWait();
+  stream->write(a);
+  stream->write(b);
+  stream->write(c);
+  stream->write(d);
+  stream->write(e);
+  stream->write(f);
+  stream->write(g);
+  stream->write(h);
+  timeoutSet(8 * BYTE_TIME);
+}
+
 // The underlying method for all high-level printing (e.g. println()).
 // The inherited Print class handles the rest!
-size_t Adafruit_Thermal::write(uint8_t c) {
+size_t Pos_Printer::write(uint8_t c) {
 
   if(c != 0x13) { // Strip carriage returns
+  #ifdef DENMARK
+	if(c == 0xC3){c = 0x00;} // 
+	if(c == 0xA5){c = '}';}  // Danish å
+	if(c == 0xB8){c = '|';}  // Danish ø
+	if(c == 0xA6){c = '{';}  // Danish æ
+	if(c == 0x85){c = ']';}  // Danish Å
+	if(c == 0x98){c = '\\';}  // Danish Ø
+	if(c == 0x86){c = '[';}  // Danish Æ
+  #endif // end ifdef DENMARK
+	  
     timeoutWait();
     stream->write(c);
     unsigned long d = BYTE_TIME;
@@ -140,12 +158,13 @@ size_t Adafruit_Thermal::write(uint8_t c) {
     }
     timeoutSet(d);
     prevByte = c;
+	
   }
 
   return 1;
 }
 
-void Adafruit_Thermal::begin(uint8_t heatTime) {
+void Pos_Printer::begin(uint8_t heatTime) {
 
   // The printer can't start receiving data immediately upon power up --
   // it needs a moment to cold boot and initialize.  Allow at least 1/2
@@ -184,10 +203,10 @@ void Adafruit_Thermal::begin(uint8_t heatTime) {
   // is n(D7-D5)*250us.
   // (Unsure of the default value for either -- not documented)
 
-#define printDensity   10 // 100% (? can go higher, text is darker but fuzzy)
-#define printBreakTime  2 // 500 uS
+#define printDensity   20 // 100% (? can go higher, text is darker but fuzzy)
+#define printBreakTime  1 // 500 uS
 
-  writeBytes(ASCII_DC2, '#', (printBreakTime << 5) | printDensity);
+  //writeBytes(ASCII_DC2, '#', (printBreakTime << 5) | printDensity);
 
   // Enable DTR pin if requested
   if(dtrPin < 255) {
@@ -196,13 +215,15 @@ void Adafruit_Thermal::begin(uint8_t heatTime) {
     dtrEnabled = true;
   }
 
-  dotPrintTime   = 30000; // See comments near top of file for
-  dotFeedTime    =  2100; // an explanation of these values.
+  dotPrintTime   =  1; // See comments near top of file for   30000  //Fastes print speed
+  dotFeedTime    =   1; // an explanation of these values.  2100     //Fastes print speed
   maxChunkHeight =   255;
+  
+  setDefault();
 }
 
 // Reset printer to default state.
-void Adafruit_Thermal::reset() {
+void Pos_Printer::reset() {
   writeBytes(ASCII_ESC, '@'); // Init command
   prevByte      = '\n';       // Treat as if prior line is blank
   column        =    0;
@@ -215,12 +236,13 @@ void Adafruit_Thermal::reset() {
   // Configure tab stops on recent printers
   writeBytes(ASCII_ESC, 'D'); // Set tab stops...
   writeBytes( 4,  8, 12, 16); // ...every 4 columns,
-  writeBytes(20, 24, 28,  0); // 0 marks end-of-list.
+  //writeBytes(20, 24, 28,  0); // 0 marks end-of-list.  //commented out to remove x( of first line
 #endif
+
 }
 
 // Reset text formatting parameters.
-void Adafruit_Thermal::setDefault(){
+void Pos_Printer::setDefault(){
   online();
   justify('L');
   inverseOff();
@@ -230,29 +252,29 @@ void Adafruit_Thermal::setDefault(){
   underlineOff();
   setBarcodeHeight(50);
   setSize('s');
-  setCharset();
-  setCodePage();
+  setCharset(CHARSET_DENMARK1);
+  setCodePage(CODEPAGE_ISO_8859_1);
 }
 
-void Adafruit_Thermal::test(){
+void Pos_Printer::test(){
   println(F("Hello World!"));
   feed(2);
 }
 
-void Adafruit_Thermal::testPage() {
+void Pos_Printer::testPage() {
   writeBytes(ASCII_DC2, 'T');
   timeoutSet(
     dotPrintTime * 24 * 26 +      // 26 lines w/text (ea. 24 dots high)
     dotFeedTime * (6 * 26 + 30)); // 26 text lines (feed 6 dots) + blank line
 }
 
-void Adafruit_Thermal::setBarcodeHeight(uint8_t val) { // Default is 50
+void Pos_Printer::setBarcodeHeight(uint8_t val) { // Default is 50
   if(val < 1) val = 1;
   barcodeHeight = val;
   writeBytes(ASCII_GS, 'h', val);
 }
 
-void Adafruit_Thermal::printBarcode(char *text, uint8_t type) {
+void Pos_Printer::printBarcode(char *text, uint8_t type) {
   feed(1); // Recent firmware can't print barcode w/o feed first???
   writeBytes(ASCII_GS, 'H', 2);    // Print label below barcode
   writeBytes(ASCII_GS, 'w', 3);    // Barcode width 3 (0.375/1.0mm thin/thick)
@@ -281,30 +303,30 @@ void Adafruit_Thermal::printBarcode(char *text, uint8_t type) {
 #define DOUBLE_WIDTH_MASK  (1 << 5)
 #define STRIKE_MASK        (1 << 6)
 
-void Adafruit_Thermal::setPrintMode(uint8_t mask) {
+void Pos_Printer::setPrintMode(uint8_t mask) {
   printMode |= mask;
   writePrintMode();
   charHeight = (printMode & DOUBLE_HEIGHT_MASK) ? 48 : 24;
   maxColumn  = (printMode & DOUBLE_WIDTH_MASK ) ? 16 : 32;
 }
 
-void Adafruit_Thermal::unsetPrintMode(uint8_t mask) {
+void Pos_Printer::unsetPrintMode(uint8_t mask) {
   printMode &= ~mask;
   writePrintMode();
   charHeight = (printMode & DOUBLE_HEIGHT_MASK) ? 48 : 24;
   maxColumn  = (printMode & DOUBLE_WIDTH_MASK ) ? 16 : 32;
 }
 
-void Adafruit_Thermal::writePrintMode() {
+void Pos_Printer::writePrintMode() {
   writeBytes(ASCII_ESC, '!', printMode);
 }
 
-void Adafruit_Thermal::normal() {
+void Pos_Printer::normal() {
   printMode = 0;
   writePrintMode();
 }
 
-void Adafruit_Thermal::inverseOn(){
+void Pos_Printer::inverseOn(){
 #if PRINTER_FIRMWARE >= 268
   writeBytes(ASCII_GS, 'B', 1);
 #else
@@ -312,7 +334,7 @@ void Adafruit_Thermal::inverseOn(){
 #endif
 }
 
-void Adafruit_Thermal::inverseOff(){
+void Pos_Printer::inverseOff(){
 #if PRINTER_FIRMWARE >= 268
   writeBytes(ASCII_GS, 'B', 0);
 #else
@@ -320,47 +342,47 @@ void Adafruit_Thermal::inverseOff(){
 #endif
 }
 
-void Adafruit_Thermal::upsideDownOn(){
+void Pos_Printer::upsideDownOn(){
   setPrintMode(UPDOWN_MASK);
 }
 
-void Adafruit_Thermal::upsideDownOff(){
+void Pos_Printer::upsideDownOff(){
   unsetPrintMode(UPDOWN_MASK);
 }
 
-void Adafruit_Thermal::doubleHeightOn(){
+void Pos_Printer::doubleHeightOn(){
   setPrintMode(DOUBLE_HEIGHT_MASK);
 }
 
-void Adafruit_Thermal::doubleHeightOff(){
+void Pos_Printer::doubleHeightOff(){
   unsetPrintMode(DOUBLE_HEIGHT_MASK);
 }
 
-void Adafruit_Thermal::doubleWidthOn(){
+void Pos_Printer::doubleWidthOn(){
   setPrintMode(DOUBLE_WIDTH_MASK);
 }
 
-void Adafruit_Thermal::doubleWidthOff(){
+void Pos_Printer::doubleWidthOff(){
   unsetPrintMode(DOUBLE_WIDTH_MASK);
 }
 
-void Adafruit_Thermal::strikeOn(){
+void Pos_Printer::strikeOn(){
   setPrintMode(STRIKE_MASK);
 }
 
-void Adafruit_Thermal::strikeOff(){
+void Pos_Printer::strikeOff(){
   unsetPrintMode(STRIKE_MASK);
 }
 
-void Adafruit_Thermal::boldOn(){
+void Pos_Printer::boldOn(){
   setPrintMode(BOLD_MASK);
 }
 
-void Adafruit_Thermal::boldOff(){
+void Pos_Printer::boldOff(){
   unsetPrintMode(BOLD_MASK);
 }
 
-void Adafruit_Thermal::justify(char value){
+void Pos_Printer::justify(char value){
   uint8_t pos = 0;
 
   switch(toupper(value)) {
@@ -373,7 +395,7 @@ void Adafruit_Thermal::justify(char value){
 }
 
 // Feeds by the specified number of lines
-void Adafruit_Thermal::feed(uint8_t x) {
+void Pos_Printer::feed(uint8_t x) {
 #if PRINTER_FIRMWARE >= 264
   writeBytes(ASCII_ESC, 'd', x);
   timeoutSet(dotFeedTime * charHeight);
@@ -385,18 +407,18 @@ void Adafruit_Thermal::feed(uint8_t x) {
 }
 
 // Feeds by the specified number of individual pixel rows
-void Adafruit_Thermal::feedRows(uint8_t rows) {
+void Pos_Printer::feedRows(uint8_t rows) {
   writeBytes(ASCII_ESC, 'J', rows);
   timeoutSet(rows * dotFeedTime);
   prevByte = '\n';
   column   =    0;
 }
 
-void Adafruit_Thermal::flush() {
+void Pos_Printer::flush() {
   writeBytes(ASCII_FF);
 }
 
-void Adafruit_Thermal::setSize(char value){
+void Pos_Printer::setSize(char value){
   uint8_t size;
 
   switch(toupper(value)) {
@@ -425,16 +447,113 @@ void Adafruit_Thermal::setSize(char value){
 // 0 - no underline
 // 1 - normal underline
 // 2 - thick underline
-void Adafruit_Thermal::underlineOn(uint8_t weight) {
+void Pos_Printer::underlineOn(uint8_t weight) {
   if(weight > 2) weight = 2;
   writeBytes(ASCII_ESC, '-', weight);
 }
 
-void Adafruit_Thermal::underlineOff() {
+void Pos_Printer::underlineOff() {
   writeBytes(ASCII_ESC, '-', 0);
 }
 
-void Adafruit_Thermal::printBitmap(
+void Pos_Printer::printBitmap( int w, int h, const uint8_t *bitmap, bool fromProgMem) {
+
+  int rowBytes, rowBytesClipped, rowStart, chunkHeight, x, y, i;
+
+  rowBytes = (w + 7) / 8; // Round up to next byte boundary
+
+  writeBytes(ASCII_GS, 'v', '0', 0, rowBytes % 256, rowBytes / 256, h % 256, h / 256);
+  i = 0;
+  for(y=0; y < h; y++) {
+    for(x=0; x < rowBytes; x++, i++) {
+      writeBytes(fromProgMem ? pgm_read_byte(bitmap + i) : *(bitmap+i));
+    }
+  }
+  timeoutSet(h * dotPrintTime);
+  prevByte = '\n';
+}
+
+//this is a ridiculous vertical dot print define, not a horizontal raster.
+//to print a c header string, you must transpose (rotate and flip) and image first
+//also beware of switched height vs width when the image is transposed
+void Pos_Printer::defineBitImage( int w, int h, const uint8_t *bitmap) {
+
+  int colBytes, rowBytes, rowBytesClipped, rowStart, chunkHeight, x, y, i;
+
+  rowBytes = (w + 7) / 8; // Round up to next byte boundary
+  colBytes = (h + 7) / 8;
+
+  writeBytes(0x1D, 0x2A, rowBytes, colBytes);
+  i = 0;
+  for(y=0; y < h; y++) {
+    for(x=0; x < rowBytes; x++, i++) {
+      writeBytes(pgm_read_byte(bitmap + (i)));
+    }
+  }
+  timeoutSet(h * dotPrintTime);
+  prevByte = '\n';
+}
+
+void Pos_Printer::printDefinedBitImage(int mode){
+  writeBytes(0x1D, 0x2F, mode);
+}
+
+//this is a ridiculous vertical dot print, not a horizontal raster.
+//to print a c header string, you must transpose (rotate and flip) and image first
+//also beware of switched height vs width when the image is transposed
+//n=1 NV images
+void Pos_Printer::defineNVBitmap( int w, int h, const uint8_t *bitmap) {
+  int colBytes, rowBytes, rowBytesClipped, rowStart, chunkHeight, x, y, i;
+
+  rowBytes = (w / 8); //Round up to next byte boundary for columns, which are transposed rows
+  colBytes = (h + 7) / 8;
+
+  writeBytes(0x1C, 0x71, 1);
+  writeBytes(rowBytes % 256, rowBytes / 256, colBytes % 256, colBytes / 256);
+  i = 0;
+  for(y=0; y < colBytes; y++) {
+    for(x=0; x < w; x++, i++) {
+      writeBytes(pgm_read_byte(bitmap + i));
+    }
+  }
+}
+
+//n=2 NV images
+void Pos_Printer::defineNVBitmap( int w1, int h1, const uint8_t *bitmap1, int w2, int h2, const uint8_t *bitmap2) {
+  int colBytes, rowBytes, rowBytesClipped, rowStart, chunkHeight, x, y, i;
+
+  rowBytes = (w1 / 8); //Round up to next byte boundary for columns, which are transposed rows
+  colBytes = (h1 +7)/ 8;
+
+  //write n=1 image
+  writeBytes(0x1C, 0x71, 2);
+  writeBytes(rowBytes % 256, rowBytes / 256, colBytes % 256, colBytes / 256);
+  i = 0;
+  for(y=0; y < colBytes; y++) {
+    for(x=0; x < rowBytes * 8; x++, i++) {
+      writeBytes(pgm_read_byte(bitmap1 + i));
+    }
+  }
+
+  //write n=2 image
+  rowBytes = (w2 / 8);
+  colBytes = (h2 + 7) / 8;
+  writeBytes(rowBytes % 256, rowBytes / 256, colBytes % 256, colBytes / 256);
+  i = 0;
+  for(y=0; y < colBytes; y++) {
+    for(x=0; x < rowBytes*8; x++, i++) {
+      writeBytes(pgm_read_byte(bitmap2 + i));
+    }
+  }
+}
+
+void Pos_Printer::printNVBitmap(int n, int mode){
+	writeBytes(0x1C, 0x70, n, mode);
+}
+
+
+
+void Pos_Printer::printBitmap_ada(
  int w, int h, const uint8_t *bitmap, bool fromProgMem) {
   int rowBytes, rowBytesClipped, rowStart, chunkHeight, chunkHeightLimit,
       x, y, i;
@@ -456,7 +575,7 @@ void Adafruit_Thermal::printBitmap(
     chunkHeight = h - rowStart;
     if(chunkHeight > chunkHeightLimit) chunkHeight = chunkHeightLimit;
 
-    writeBytes(ASCII_DC2, '*', chunkHeight, rowBytesClipped);
+    writeBytes(ASCII_ESC, '*', chunkHeight, rowBytesClipped); //ASCII_DC2
 
     for(y=0; y < chunkHeight; y++) {
       for(x=0; x < rowBytesClipped; x++, i++) {
@@ -470,7 +589,7 @@ void Adafruit_Thermal::printBitmap(
   prevByte = '\n';
 }
 
-void Adafruit_Thermal::printBitmap(int w, int h, Stream *fromStream) {
+void Pos_Printer::printBitmap_ada(int w, int h, Stream *fromStream) {
   int rowBytes, rowBytesClipped, rowStart, chunkHeight, chunkHeightLimit,
       x, y, i, c;
 
@@ -491,7 +610,7 @@ void Adafruit_Thermal::printBitmap(int w, int h, Stream *fromStream) {
     chunkHeight = h - rowStart;
     if(chunkHeight > chunkHeightLimit) chunkHeight = chunkHeightLimit;
 
-    writeBytes(ASCII_DC2, '*', chunkHeight, rowBytesClipped);
+    writeBytes(ASCII_ESC, '*', chunkHeight, rowBytesClipped); //ASCII_DC2
 
     for(y=0; y < chunkHeight; y++) {
       for(x=0; x < rowBytesClipped; x++) {
@@ -508,7 +627,7 @@ void Adafruit_Thermal::printBitmap(int w, int h, Stream *fromStream) {
   prevByte = '\n';
 }
 
-void Adafruit_Thermal::printBitmap(Stream *fromStream) {
+void Pos_Printer::printBitmap_ada(Stream *fromStream) {
   uint8_t  tmp;
   uint16_t width, height;
 
@@ -518,28 +637,28 @@ void Adafruit_Thermal::printBitmap(Stream *fromStream) {
   tmp    =  fromStream->read();
   height = (fromStream->read() << 8) + tmp;
 
-  printBitmap(width, height, fromStream);
+  printBitmap_ada(width, height, fromStream);
 }
 
 // Take the printer offline. Print commands sent after this will be
 // ignored until 'online' is called.
-void Adafruit_Thermal::offline(){
+void Pos_Printer::offline(){
   writeBytes(ASCII_ESC, '=', 0);
 }
 
 // Take the printer back online. Subsequent print commands will be obeyed.
-void Adafruit_Thermal::online(){
+void Pos_Printer::online(){
   writeBytes(ASCII_ESC, '=', 1);
 }
 
 // Put the printer into a low-energy state immediately.
-void Adafruit_Thermal::sleep() {
+void Pos_Printer::sleep() {
   sleepAfter(1); // Can't be 0, that means 'don't sleep'
 }
 
 // Put the printer into a low-energy state after the given number
 // of seconds.
-void Adafruit_Thermal::sleepAfter(uint16_t seconds) {
+void Pos_Printer::sleepAfter(uint16_t seconds) {
 #if PRINTER_FIRMWARE >= 264
   writeBytes(ASCII_ESC, '8', seconds, seconds >> 8);
 #else
@@ -548,7 +667,7 @@ void Adafruit_Thermal::sleepAfter(uint16_t seconds) {
 }
 
 // Wake the printer from a low-energy state.
-void Adafruit_Thermal::wake() {
+void Pos_Printer::wake() {
   timeoutSet(0);   // Reset timeout counter
   writeBytes(255); // Wake
 #if PRINTER_FIRMWARE >= 264
@@ -569,12 +688,8 @@ void Adafruit_Thermal::wake() {
 // Check the status of the paper using the printer's self reporting
 // ability.  Returns true for paper, false for no paper.
 // Might not work on all printers!
-bool Adafruit_Thermal::hasPaper() {
-#if PRINTER_FIRMWARE >= 264
-  writeBytes(ASCII_ESC, 'v', 0);
-#else
-  writeBytes(ASCII_GS, 'r', 0);
-#endif
+bool Pos_Printer::hasPaper() {
+  writeBytes(0x10, 0x04, 4);
 
   int status = -1;
   for(uint8_t i=0; i<10; i++) {
@@ -588,7 +703,7 @@ bool Adafruit_Thermal::hasPaper() {
   return !(status & 0b00000100);
 }
 
-void Adafruit_Thermal::setLineHeight(int val) {
+void Pos_Printer::setLineHeight(int val) {
   if(val < 24) val = 24;
   lineSpacing = val - 24;
 
@@ -599,38 +714,53 @@ void Adafruit_Thermal::setLineHeight(int val) {
   writeBytes(ASCII_ESC, '3', val);
 }
 
-void Adafruit_Thermal::setMaxChunkHeight(int val) {
+void Pos_Printer::setMaxChunkHeight(int val) {
   maxChunkHeight = val;
 }
 
 // These commands work only on printers w/recent firmware ------------------
 
 // Alters some chars in ASCII 0x23-0x7E range; see datasheet
-void Adafruit_Thermal::setCharset(uint8_t val) {
+void Pos_Printer::setCharset(uint8_t val) {
   if(val > 15) val = 15;
   writeBytes(ASCII_ESC, 'R', val);
 }
 
 // Selects alt symbols for 'upper' ASCII values 0x80-0xFF
-void Adafruit_Thermal::setCodePage(uint8_t val) {
+void Pos_Printer::setCodePage(uint8_t val) {
   if(val > 47) val = 47;
   writeBytes(ASCII_ESC, 't', val);
 }
 
-void Adafruit_Thermal::tab() {
+void Pos_Printer::tab() {
   writeBytes(ASCII_TAB);
   column = (column + 4) & 0b11111100;
 }
 
-void Adafruit_Thermal::setCharSpacing(int spacing) {
+void Pos_Printer::setCharSpacing(int spacing) {
   writeBytes(ASCII_ESC, ' ', spacing);
+}
+
+// Cut paper.
+void Pos_Printer::cut(){
+  writeBytes(ASCII_GS, 'V', 0);
+}
+
+// Make printer beep
+void Pos_Printer::beep(){
+  writeBytes(ASCII_ESC, 'o');
+  //writeBytes(30);
+}
+
+void Pos_Printer::setBeep(int sec) {
+	writeBytes(ASCII_GS, 'o', sec);
 }
 
 // -------------------------------------------------------------------------
 
 // Standard ESC/POS commands that work only on printers that support these commands
 
-void Adafruit_Thermal::printQRcode(char *text, uint8_t errCorrect, uint8_t moduleSize, uint8_t model, uint16_t timeoutQR) {	//Store data and print QR Code
+void Pos_Printer::printQRcode(char *text, uint8_t errCorrect, uint8_t moduleSize, uint8_t model, uint16_t timeoutQR) {	//Store data and print QR Code
 	
 	//Set QR-Code model
 	//Range
@@ -672,7 +802,7 @@ void Adafruit_Thermal::printQRcode(char *text, uint8_t errCorrect, uint8_t modul
 	
 }	
  
-void Adafruit_Thermal::reprintQRcode(uint16_t timeoutQR) { //Reprint a previously printed QR Code 
+void Pos_Printer::reprintQRcode(uint16_t timeoutQR) { //Reprint a previously printed QR Code 
 	//Print QR code (fn=181) 
 	timeoutWait();
 	writeBytes(ASCII_GS, '(', 'k', 3);  

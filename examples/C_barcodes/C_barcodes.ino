@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------
-  Example sketch for Adafruit Thermal Printer library for Arduino.
+  Example sketch for POS Printer library for Arduino.
   Demonstrates the available gamut of barcodes.
   See 'A_printertest' sketch for a more generalized printing example.
 
@@ -7,7 +7,7 @@
   displayed, this is normal.  Sketch may need changes for older firmware.
   ------------------------------------------------------------------------*/
 
-#include "Adafruit_Thermal.h"
+#include "Pos_Printer.h"
 
 // Here's the syntax when using SoftwareSerial (e.g. Arduino Uno) --------
 // If using hardware serial instead, comment out or remove these lines:
@@ -17,13 +17,13 @@
 #define RX_PIN 5 // Arduino receive   GREEN WIRE   labeled TX on printer
 
 SoftwareSerial mySerial(RX_PIN, TX_PIN); // Declare SoftwareSerial obj first
-Adafruit_Thermal printer(&mySerial);     // Pass addr to printer constructor
+Pos_Printer printer(&mySerial);     // Pass addr to printer constructor
 // Then see setup() function regarding serial & printer begin() calls.
 
 // Here's the syntax for hardware serial (e.g. Arduino Due) --------------
 // Un-comment the following line if using hardware serial:
 
-//Adafruit_Thermal printer(&Serial1);      // Or Serial2, Serial3, etc.
+//Pos_Printer printer(&Serial1);      // Or Serial2, Serial3, etc.
 
 // -----------------------------------------------------------------------
 
@@ -34,8 +34,8 @@ void setup() {
   // wired up the same way (w/3-pin header into pins 5/6/7):
   pinMode(7, OUTPUT); digitalWrite(7, LOW);
 
-  mySerial.begin(19200);  // Initialize SoftwareSerial
-  //Serial1.begin(19200); // Use this instead if using hardware serial
+  mySerial.begin(9600);  // Initialize SoftwareSerial
+  //Serial1.begin(9600); // Use this instead if using hardware serial
   printer.begin();        // Init printer (same regardless of serial type)
 
   printer.justify('C');
@@ -50,6 +50,8 @@ void setup() {
 
   // Also note that strings passed to printBarcode() are always normal
   // RAM-resident strings; PROGMEM strings (e.g. F("123")) are NOT used.
+
+   printer.setBarcodeHeight(150);
 
   // UPC-A: 12 digits
   printer.print(F("UPC-A:"));
@@ -84,12 +86,15 @@ void setup() {
   // CODE 93: compressed version of Code 39?
   printer.print(F("CODE 93:"));
   printer.printBarcode("ADAFRUIT", CODE93);
-
+  
+/* Commented out because I can't get this one working yet
   // CODE 128: 2-255 characters (ASCII 0-127)
   printer.print(F("CODE128:"));
   printer.printBarcode("Adafruit", CODE128);
+*/
 
-  printer.feed(2);
+  printer.feed(10);
+  printer.cut();
   printer.setDefault(); // Restore printer to defaults
 }
 
