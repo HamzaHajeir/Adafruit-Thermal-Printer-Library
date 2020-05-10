@@ -645,10 +645,8 @@ void Pos_Printer::sleepAfter(uint16_t seconds) {
 // Wake the printer from a low-energy state.
 void Pos_Printer::wake() {
   
-  writeBytes(255); // Wake
 #if PRINTER_FIRMWARE >= 264
-  delay(50);
-  writeBytes(ASCII_ESC, '8', 0, 0); // Sleep off (important!)
+  writeBytes(ASCII_ESC, 64); // Sleep off (important!)
 #else
   // Datasheet recommends a 50 mS delay before issuing further commands,
   // but in practice this alone isn't sufficient (e.g. text size/style
