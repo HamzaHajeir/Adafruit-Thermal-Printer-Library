@@ -52,19 +52,8 @@ Pos_Printer::Pos_Printer(Stream *s, uint8_t dtr) :
   dtrEnabled = false;
 }
 
-// This method sets the estimated completion time for a just-issued task.
-void Pos_Printer::timeoutSet(unsigned long x) {
-  if(!dtrEnabled) resumeTime = micros() + x;
-}
 
-// This function waits (if necessary) for the prior task to complete.
-void Pos_Printer::timeoutWait() {
-  if(dtrEnabled) {
-    while(digitalRead(dtrPin) == HIGH){yield();};
-  } else {
-    while((long)(micros() - resumeTime) < 0L){yield();}; // (syntax is rollover-proof)
-  }
-}
+
 
 // Printer performance may vary based on the power supply voltage,
 // thickness of paper, phase of the moon and other seemingly random
@@ -86,38 +75,34 @@ void Pos_Printer::setTimes(unsigned long p, unsigned long f) {
 // commands, printing bitmaps or barcodes, etc.  Not when printing text.
 
 void Pos_Printer::writeBytes(uint8_t a) {
-  timeoutWait();
+  
   stream->write(a);
-  timeoutSet(BYTE_TIME);
 }
 
 void Pos_Printer::writeBytes(uint8_t a, uint8_t b) {
-  timeoutWait();
+  
   stream->write(a);
   stream->write(b);
-  timeoutSet(2 * BYTE_TIME);
 }
 
 void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c) {
-  timeoutWait();
+  
   stream->write(a);
   stream->write(b);
   stream->write(c);
-  timeoutSet(3 * BYTE_TIME);
 }
 
 void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d) {
-  timeoutWait();
+  
   stream->write(a);
   stream->write(b);
   stream->write(c);
   stream->write(d);
-  timeoutSet(4 * BYTE_TIME);
 }
 
 // Riva Addition _ Updated
 void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t e, uint8_t f, uint8_t g, uint8_t h) {
-  timeoutWait();
+  
   stream->write(a);
   stream->write(b);
   stream->write(c);
@@ -126,7 +111,6 @@ void Pos_Printer::writeBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d, uint8_t
   stream->write(f);
   stream->write(g);
   stream->write(h);
-  timeoutSet(8 * BYTE_TIME);
 }
 
 // The underlying method for all high-level printing (e.g. println()).
@@ -144,7 +128,7 @@ size_t Pos_Printer::write(uint8_t c) {
 	if(c == 0x86){c = '[';}  // Danish Æ
   #endif // end ifdef DENMARK
 	  
-    timeoutWait();
+    
     stream->write(c);
     unsigned long d = BYTE_TIME;
     if((c == '\n') || (column == maxColumn)) { // If newline or wrap
@@ -156,7 +140,6 @@ size_t Pos_Printer::write(uint8_t c) {
     } else {
       column++;
     }
-    timeoutSet(d);
     prevByte = c;
 	
   }
@@ -169,7 +152,6 @@ void Pos_Printer::begin(uint8_t heatTime) {
   // The printer can't start receiving data immediately upon power up --
   // it needs a moment to cold boot and initialize.  Allow at least 1/2
   // sec of uptime before printer can receive data.
-  timeoutSet(500000L);
 
   wake();
   reset();
@@ -263,9 +245,6 @@ void Pos_Printer::test(){
 
 void Pos_Printer::testPage() {
   writeBytes(ASCII_DC2, 'T');
-  timeoutSet(
-    dotPrintTime * 24 * 26 +      // 26 lines w/text (ea. 24 dots high)
-    dotFeedTime * (6 * 26 + 30)); // 26 text lines (feed 6 dots) + blank line
 }
 
 void Pos_Printer::setBarcodeHeight(uint8_t val) { // Default is 50
@@ -290,7 +269,6 @@ void Pos_Printer::printBarcode(char *text, uint8_t type) {
     writeBytes(c = text[i++]);
   } while(c);
 #endif
-  timeoutSet((barcodeHeight + 40) * dotPrintTime);
   prevByte = '\n';
 }
 
@@ -398,7 +376,6 @@ void Pos_Printer::justify(char value){
 void Pos_Printer::feed(uint8_t x) {
 #if PRINTER_FIRMWARE >= 264
   writeBytes(ASCII_ESC, 'd', x);
-  timeoutSet(dotFeedTime * charHeight);
   prevByte = '\n';
   column   =    0;
 #else
@@ -409,7 +386,6 @@ void Pos_Printer::feed(uint8_t x) {
 // Feeds by the specified number of individual pixel rows
 void Pos_Printer::feedRows(uint8_t rows) {
   writeBytes(ASCII_ESC, 'J', rows);
-  timeoutSet(rows * dotFeedTime);
   prevByte = '\n';
   column   =    0;
 }
@@ -469,7 +445,7 @@ void Pos_Printer::printBitmap( int w, int h, const uint8_t *bitmap, bool fromPro
       writeBytes(fromProgMem ? pgm_read_byte(bitmap + i) : *(bitmap+i));
     }
   }
-  timeoutSet(h * dotPrintTime);
+  
   prevByte = '\n';
 }
 
@@ -490,7 +466,7 @@ void Pos_Printer::defineBitImage( int w, int h, const uint8_t *bitmap) {
       writeBytes(pgm_read_byte(bitmap + (i)));
     }
   }
-  timeoutSet(h * dotPrintTime);
+  
   prevByte = '\n';
 }
 
@@ -579,12 +555,12 @@ void Pos_Printer::printBitmap_ada(
 
     for(y=0; y < chunkHeight; y++) {
       for(x=0; x < rowBytesClipped; x++, i++) {
-        timeoutWait();
+        
         stream->write(fromProgMem ? pgm_read_byte(bitmap + i) : *(bitmap+i));
       }
       i += rowBytes - rowBytesClipped;
     }
-    timeoutSet(chunkHeight * dotPrintTime);
+    
   }
   prevByte = '\n';
 }
@@ -615,14 +591,14 @@ void Pos_Printer::printBitmap_ada(int w, int h, Stream *fromStream) {
     for(y=0; y < chunkHeight; y++) {
       for(x=0; x < rowBytesClipped; x++) {
         while((c = fromStream->read()) < 0);
-        timeoutWait();
+        
         stream->write((uint8_t)c);
       }
       for(i = rowBytes - rowBytesClipped; i>0; i--) {
         while((c = fromStream->read()) < 0);
       }
     }
-    timeoutSet(chunkHeight * dotPrintTime);
+    
   }
   prevByte = '\n';
 }
@@ -668,7 +644,7 @@ void Pos_Printer::sleepAfter(uint16_t seconds) {
 
 // Wake the printer from a low-energy state.
 void Pos_Printer::wake() {
-  timeoutSet(0);   // Reset timeout counter
+  
   writeBytes(255); // Wake
 #if PRINTER_FIRMWARE >= 264
   delay(50);
@@ -680,7 +656,7 @@ void Pos_Printer::wake() {
   // delay, interspersed with NUL chars (no-ops) seems to help.
   for(uint8_t i=0; i<10; i++) {
     writeBytes(0);
-    timeoutSet(10000L);
+    
   }
 #endif
 }
@@ -804,11 +780,11 @@ void Pos_Printer::printQRcode(char *text, uint8_t errCorrect, uint8_t moduleSize
  
 void Pos_Printer::reprintQRcode(uint16_t timeoutQR) { //Reprint a previously printed QR Code 
 	//Print QR code (fn=181) 
-	timeoutWait();
+	
 	writeBytes(ASCII_GS, '(', 'k', 3);  
 	writeBytes(0, 49, 81, 48); 
     //Time needed to print QR-Code.
-    timeoutSet(timeoutQR);
+    
 	
 	prevByte = '\n'; /// Treat as if prior line is blank
 
