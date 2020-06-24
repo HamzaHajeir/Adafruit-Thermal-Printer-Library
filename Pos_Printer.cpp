@@ -18,7 +18,7 @@
 // this constant.  This will NOT make printing slower!  The physical
 // print and feed mechanisms are the bottleneck, not the port speed.
 
-#define BAUDRATE  19200  //Check the switches under the PP-700II to verify baud
+#define BAUDRATE  9600  //Check the switches under the PP-700II to verify baud
 
 // ASCII codes used by some of the printer config commands:
 #define ASCII_TAB '\t' // Horizontal tab
