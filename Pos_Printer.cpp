@@ -252,8 +252,8 @@ void Pos_Printer::setDefault(){
   underlineOff();
   setBarcodeHeight(50);
   setSize('s');
-  setCharset(CHARSET_DENMARK1);
-  setCodePage(CODEPAGE_ISO_8859_1);
+  setCharset();
+  setCodePage();
 }
 
 void Pos_Printer::test(){
