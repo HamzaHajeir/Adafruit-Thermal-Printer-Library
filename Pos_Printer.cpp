@@ -671,7 +671,8 @@ void Pos_Printer::wake() {
   timeoutSet(0);   // Reset timeout counter
   writeBytes(255); // Wake
 #if PRINTER_FIRMWARE >= 264
-  writeBytes(ASCII_ESC, 64); // Sleep off (important!)
+  delay(50);
+  writeBytes(ASCII_ESC, '8', 0, 0); // Sleep off (important!)
 #else
   // Datasheet recommends a 50 mS delay before issuing further commands,
   // but in practice this alone isn't sufficient (e.g. text size/style
