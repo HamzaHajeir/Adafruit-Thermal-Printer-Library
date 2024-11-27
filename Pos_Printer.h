@@ -20,6 +20,7 @@
 #define PRINTER_FIRMWARE 629    //268
 
 #include "Arduino.h"
+#include <vector>
 
 // Barcode types and charsets
 #if PRINTER_FIRMWARE >= 264
@@ -29,7 +30,7 @@
  #define EAN8    68
  #define CODE39  69
  #define ITF     70
- #define CODABAR 71
+ #define CODEBAR 71
  #define CODE93  72
  #define CODE128 73
 
@@ -121,6 +122,44 @@
  #define MSI     10
 #endif
 
+// #define DEBUG_PRINTER_
+#ifdef DEBUG_PRINTER_
+#define DEBUG_(f_,...)     Serial.printf((f_), ##__VA_ARGS__)
+#define SERIAL_WRITE(c)     Serial.printf("%02X",c)
+#else
+#define DEBUG_(f_,...)
+#define SERIAL_WRITE(c)
+#endif
+
+#define EXCESS_BYTES        75           //For next commands to be stored in internalBuffer.
+
+#ifdef ARDUINO_ARCH_ESP8266
+#define AVAILABLE_MEM   ESP.getMaxFreeBlockSize()
+#elif defined(ARDUINO_ARCH_ESP32)
+#define AVAILABLE_MEM   ESP.getMaxAllocHeap()
+#elif defined(__AVR__) || defined(__arm__)
+#ifdef __arm__      // Check https://github.com/mpflaga/Arduino-MemoryFree
+// should use uinstd.h to define sbrk but Due causes a conflict
+extern "C" char* sbrk(int incr);
+#else  // __ARM__
+extern char *__brkval;
+#endif  // __arm__
+
+int freeMemory() {
+  char top;
+#ifdef __arm__
+  return &top - reinterpret_cast<char*>(sbrk(0));
+#elif defined(CORE_TEENSY) || (ARDUINO > 103 && ARDUINO != 151)
+  return &top - __brkval;
+#else  // __arm__
+  return __brkval ? &top - __brkval : &top - __malloc_heap_start;
+#endif  // __arm__
+}
+#define AVAILABLE_MEM   freeMemory()
+#else
+#error "Define AVAILABLE_MEM for your MCU target at Adafruit_Printer.h L151"
+#endif
+
 class Pos_Printer : public Print {
 
  public:
@@ -133,6 +172,7 @@ class Pos_Printer : public Print {
     write(uint8_t c);
   void
     begin(uint8_t heatTime=120),
+    loop(),
     boldOff(),
     boldOn(),
     doubleHeightOff(),
@@ -149,17 +189,16 @@ class Pos_Printer : public Print {
     online(),
     printBarcode(char *text, uint8_t type),
 
-    printQRcode(char *text, uint8_t errCorrect=48, uint8_t moduleSize=3, uint8_t model=50, uint16_t timeoutQR=4000000L), // Only works on printers with support for this feature
+    printQRcode(const char *text, uint8_t errCorrect=48, uint8_t moduleSize=3, uint8_t model=50), // Only works on printers with support for this feature
 
 	  
-	printBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem = true),
     printBitmap_ada(int w, int h, const uint8_t *bitmap, bool fromProgMem=true),
     printBitmap_ada(int w, int h, Stream *fromStream),
     printBitmap_ada(Stream *fromStream),
 
     normal(),
     reset(),
-    reprintQRcode(uint16_t timeoutQR=4000000L), // Only works on printers with support for this feature
+    reprintQRcode(), // Only works on printers with support for this feature
     setBarcodeHeight(uint8_t val=50),
     setCharSpacing(int spacing=0), // Only works w/recent firmware
     setCharset(uint8_t val=0),
@@ -183,23 +222,34 @@ class Pos_Printer : public Print {
     upsideDownOff(),
     upsideDownOn(),
     wake(),
+    askForPaperAvailability(),
 
   	cut(),
   	beep(),
-    defineBitImage( int w, int h, const uint8_t *bitmap),
     printDefinedBitImage(int mode=0),
     printNVBitmap(int n, int mode=0),
-    defineNVBitmap(int w, int h, const uint8_t *bitmap),
-    defineNVBitmap(int w1, int h1, const uint8_t *bitmap1,int w2, int h2, const uint8_t *bitmap2),
-    setBeep(int sec);
+    setBeep(int sec),
+    setBytes(uint8_t a),
+    setBytes(uint8_t a, uint8_t b),
+    setBytes(uint8_t a, uint8_t b, uint8_t c),
+    setBytes(uint8_t a, uint8_t b, uint8_t c, uint8_t d);
 
+  int
+	printBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem = true),
+    defineBitImage( int w, int h, const uint8_t *bitmap, bool fromProgMem),
+    defineNVBitmap(int w, int h, const uint8_t *bitmap, bool fromProgMem),
+    defineNVBitmap(int w1, int h1, const uint8_t *bitmap1,int w2, int h2, const uint8_t *bitmap2, bool fromProgMem),
+    paperLevel(),
+    reserveBytes(int size);
   bool
     hasPaper();
+  bool emptyBuffer() { return internalBuffer.empty(); }
 
  private:
 
   Stream
     *stream;
+std::vector<uint8_t> internalBuffer;
   uint8_t
     printMode,
     prevByte,      // Last character issued to printer
@@ -211,11 +261,17 @@ class Pos_Printer : public Print {
     maxChunkHeight,
     dtrPin;        // DTR handshaking pin (experimental)
   boolean
-    dtrEnabled;    // True if DTR pin set & printer initialized
-  unsigned long
-    resumeTime,    // Wait until micros() exceeds this before sending byte
-    dotPrintTime,  // Time to print a single dot line, in microseconds
-    dotFeedTime;   // Time to feed a single dot line, in microseconds
+    dtrEnabled,    // True if DTR pin set & printer initialized
+    paperResultReady,
+    largeReserve,
+    askedForPaper;
+  int
+    paperStatus; // Holding the result of askForPaperAvailability
+unsigned long
+    resumeTime,      // Wait until micros() exceeds this before sending byte
+    lastWritingTime, // To build the next printing time (resumeTime) upun it
+    dotPrintTime,    // Time to print a single dot line, in microseconds
+    dotFeedTime;     // Time to feed a single dot line, in microseconds
   void
     writeBytes(uint8_t a),
     writeBytes(uint8_t a, uint8_t b),
@@ -226,6 +282,7 @@ class Pos_Printer : public Print {
 	
     setPrintMode(uint8_t mask),
     unsetPrintMode(uint8_t mask),
+    storeInBuffer(uint8_t c),
     writePrintMode();
 
 };
